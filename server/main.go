@@ -8,13 +8,21 @@ import (
 )
 
 func main() {
-	// Start listing on port 8080
+	// Start listing on port 8080.
 	listener, err := net.Listen("tcp", ":8080")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer listener.Close()
 
+	// Clean up the port listener.
+	defer func() {
+		if err := listener.Close(); err != nil {
+			log.Println("Error closing listener:", err)
+		}
+	}()
+
+	// Start listing for connections.
+	log.Println("Listening on :8080")
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -26,16 +34,27 @@ func main() {
 }
 
 func handleConnection(conn net.Conn) {
-	defer conn.Close()
+	// Clean connection.
+	defer func() {
+		if err := conn.Close(); err != nil {
+			log.Println("Error closing connection:", err)
+		}
+	}()
 
 	reader := bufio.NewReader(conn)
 	request, _ := http.ReadRequest(reader)
 
 	response, err := handshake(request)
 	if err != nil {
-		log.Println(err)
-		conn.Close()
+		log.Println("Error in handshake:", err)
+		if err := conn.Close(); err != nil {
+			log.Println("Error closing connection after handshake error:", err)
+		}
+		return
 	}
 
-	conn.Write([]byte(response))
+	_, err = conn.Write([]byte(response))
+	if err != nil {
+		log.Println("Error writing response:", err)
+	}
 }
